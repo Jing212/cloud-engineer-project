@@ -1,0 +1,16 @@
+---
+- name: Install nginx on EC2
+  hosts: web
+  become: yes
+
+  tasks:
+    - name: Install nginx
+      dnf:
+        name: nginx
+        state: present
+
+    - name: Start nginx
+      service:
+        name: nginx
+        state: started
+        enabled: yes

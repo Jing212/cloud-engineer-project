@@ -1,0 +1,20 @@
+# Terraform - 递归忽略所有子目录下的隐藏文件夹
+**/.terraform/
+.terraform/
+terraform/.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+.terraform.lock.hcl
+
+# Python/Flask
+__pycache__/
+*.py[cod]
+.env
+venv/
+env/
+
+# 敏感文件与系统文件
+.DS_Store
+*.pem
+*.key
