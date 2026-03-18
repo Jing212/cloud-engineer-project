@@ -1,5 +1,7 @@
 # AWS Production-style Flask App Infrastructure with Terraform
 
+! Tested with Terraform 1.7+ and AWS provider 5.100.x.
+
 This project demonstrates a production-style AWS infrastructure built with Terraform. It deploys a Flask application on private EC2 instances behind an Application Load Balancer, with Auto Scaling, secure networking, RDS, and Systems Manager access.
 
 ## 🌟 Why This Architecture is Robust
