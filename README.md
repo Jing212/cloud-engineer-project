@@ -59,9 +59,7 @@ Specify your target AWS region.
 
 ### 3. SSH Key Access
 If you choose to use traditional SSH instead of SSM, ensure your .pem file permissions are set correctly:
-chmod 400 your-key.pem
-
-### 4. Key_pair 
+chmod 400 your-key.pem 
 
 ##Deployment instructions
 terraform fmt -recursive
