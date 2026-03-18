@@ -53,7 +53,7 @@ Ensure your AWS CLI is configured with the correct permissions:
 aws configure
 
 ### 2. Variable Configuration
-Replace the default ket pair name with your existing AWS Key Pair.
+Update `terraform.tfvars` with your own key pair name before running Terraform.
 Set your own db_username and db_password.
 Specify your target AWS region. 
 
@@ -61,7 +61,9 @@ Specify your target AWS region.
 If you choose to use traditional SSH instead of SSM, ensure your .pem file permissions are set correctly:
 chmod 400 your-key.pem
 
-# Deployment instructions
+### 4. Key_pair 
+
+##Deployment instructions
 terraform fmt -recursive
 terraform init
 terraform validate
