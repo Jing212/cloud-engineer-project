@@ -18,3 +18,8 @@ variable "instance_type" {
 variable "ami_id" {
   type = string
 }
+
+variable "key_name" {
+  description = "The key name to use for the instance"
+  type        = string
+}
