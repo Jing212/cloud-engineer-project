@@ -51,3 +51,8 @@ variable "az_2" {
   type        = string
   default     = "us-east-1b"
 }
+
+variable "project_name" {
+  description = "Name of the project used for tagging resources"
+  type        = string
+}

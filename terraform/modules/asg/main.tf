@@ -2,7 +2,9 @@ resource "aws_launch_template" "main" {
   name_prefix   = "${var.project_name}-lt-"
   image_id      = var.ami_id
   instance_type = var.instance_type
-  key_name      = var.key_name
+
+  # Optional: include only if SSH access is desired
+  key_name = var.key_name
 
   iam_instance_profile {
     name = var.instance_profile_name
@@ -70,7 +72,7 @@ http {
     default_type  application/octet-stream;
 
     sendfile        on;
-    keepalive_timeout  65;
+    keepalive_timeout 65;
 
     server {
         listen 80 default_server;

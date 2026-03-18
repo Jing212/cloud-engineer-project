@@ -4,9 +4,6 @@ resource "aws_instance" "web" {
   subnet_id              = var.subnet_id
   vpc_security_group_ids = [var.security_group_id]
 
-  # Optional: only needed if you want SSH access
-  key_name = var.key_name
-
   # Private instance for SSM-based access
   associate_public_ip_address = false
 

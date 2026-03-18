@@ -1,124 +1,127 @@
-rresource "aws_launch_template" "main" {
-  name_prefix   = "${var.project_name}-lt-"
-  image_id      = var.ami_id
-  instance_type = var.instance_type
+# 1. 创建 VPC
+resource "aws_vpc" "main" {
+  cidr_block           = var.vpc_cidr
+  enable_dns_hostnames = true
+  enable_dns_support   = true
 
-  # Optional: include only if SSH access is desired
-  key_name = var.key_name
-
-  iam_instance_profile {
-    name = var.instance_profile_name
-  }
-
-  network_interfaces {
-    associate_public_ip_address = false
-    security_groups             = [var.security_group_id]
-  }
-
-  user_data = base64encode(<<-EOF
-#!/bin/bash
-set -xe
-
-dnf update -y
-dnf install -y nginx python3 python3-pip
-
-mkdir -p /opt/flask-app
-
-cat > /opt/flask-app/app.py <<'PYEOF'
-from flask import Flask
-import socket
-
-app = Flask(__name__)
-
-@app.route("/")
-def home():
-    hostname = socket.gethostname()
-    return f"""
-    <h1>Hello from Flask App Tier</h1>
-    <p><strong>Hostname:</strong> {hostname}</p>
-    <p><strong>Version:</strong> v1</p>
-    """
-PYEOF
-
-python3 -m pip install flask gunicorn
-
-cat > /etc/systemd/system/flask-app.service <<'SERVICEEOF'
-[Unit]
-Description=Gunicorn for Flask app
-After=network.target
-
-[Service]
-User=root
-WorkingDirectory=/opt/flask-app
-ExecStart=/usr/bin/python3 -m gunicorn -w 2 -b 127.0.0.1:8000 app:app
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
-SERVICEEOF
-
-cat > /etc/nginx/nginx.conf <<'NGINXEOF'
-user nginx;
-worker_processes auto;
-error_log /var/log/nginx/error.log;
-pid /run/nginx.pid;
-
-events {
-    worker_connections 1024;
-}
-
-http {
-    include       /etc/nginx/mime.types;
-    default_type  application/octet-stream;
-
-    sendfile        on;
-    keepalive_timeout 65;
-
-    server {
-        listen 80 default_server;
-        server_name _;
-
-        location / {
-            proxy_pass http://127.0.0.1:8000;
-        }
-    }
-}
-NGINXEOF
-
-systemctl daemon-reload
-systemctl enable flask-app
-systemctl start flask-app
-systemctl enable nginx
-systemctl restart nginx
-EOF
-  )
-
-  tag_specifications {
-    resource_type = "instance"
-
-    tags = {
-      Name = "${var.project_name}-asg-instance"
-    }
+  tags = {
+    Name = "${var.project_name}-vpc"
   }
 }
 
-resource "aws_autoscaling_group" "main" {
-  name                = "${var.project_name}-asg"
-  desired_capacity    = 2
-  min_size            = 2
-  max_size            = 2
-  vpc_zone_identifier = [var.subnet_1_id, var.subnet_2_id]
-  target_group_arns   = [var.target_group_arn]
-  health_check_type   = "ELB"
+# 2. 创建 Internet Gateway
+resource "aws_internet_gateway" "main" {
+  vpc_id = aws_vpc.main.id
 
-  launch_template {
-    id      = aws_launch_template.main.id
-    version = "$Latest"
+  tags = {
+    Name = "${var.project_name}-igw"
+  }
+}
+
+# 3. 创建 Public Subnets
+resource "aws_subnet" "public_subnet_1" {
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = var.public_subnet_1_cidr
+  availability_zone       = var.az_1
+  map_public_ip_on_launch = true
+
+  tags = { Name = "${var.project_name}-public-1" }
+}
+
+resource "aws_subnet" "public_subnet_2" {
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = var.public_subnet_2_cidr
+  availability_zone       = var.az_2
+  map_public_ip_on_launch = true
+
+  tags = { Name = "${var.project_name}-public-2" }
+}
+
+# 4. 创建 Private App Subnets
+resource "aws_subnet" "private_app_subnet_1" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = var.private_app_subnet_1_cidr
+  availability_zone = var.az_1
+
+  tags = { Name = "${var.project_name}-private-app-1" }
+}
+
+resource "aws_subnet" "private_app_subnet_2" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = var.private_app_subnet_2_cidr
+  availability_zone = var.az_2
+
+  tags = { Name = "${var.project_name}-private-app-2" }
+}
+
+# 5. 创建 Private DB Subnets
+resource "aws_subnet" "private_db_subnet_1" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = var.private_db_subnet_1_cidr
+  availability_zone = var.az_1
+
+  tags = { Name = "${var.project_name}-private-db-1" }
+}
+
+resource "aws_subnet" "private_db_subnet_2" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = var.private_db_subnet_2_cidr
+  availability_zone = var.az_2
+
+  tags = { Name = "${var.project_name}-private-db-2" }
+}
+
+# --- NAT Gateway 配置 ---
+
+# 1. 为 NAT Gateway 申请一个静态公网 IP (EIP)
+resource "aws_eip" "nat" {
+  domain = "vpc"
+  tags   = { Name = "${var.project_name}-nat-eip" }
+}
+
+# 2. 在公有子网中创建 NAT Gateway
+# 注意：NAT 必须放在 Public Subnet 才能通向互联网
+resource "aws_nat_gateway" "main" {
+  allocation_id = aws_eip.nat.id
+  subnet_id     = aws_subnet.public_subnet_1.id # 放在其中一个公有子网即可
+
+  tags = { Name = "${var.project_name}-nat-gw" }
+
+  # 良好的习惯：确保 IGW 先创建好
+  depends_on = [aws_internet_gateway.main]
+}
+
+# --- 路由表配置 ---
+
+# 3. 为私有子网创建专用的路由表
+resource "aws_route_table" "private" {
+  vpc_id = aws_vpc.main.id
+
+  route {
+    cidr_block     = "0.0.0.0/0"
+    nat_gateway_id = aws_nat_gateway.main.id
   }
 
-  tag {
-    key                 = "Name"
-    value               = "${var.project_name}-asg-instance"
-    propagate_at_launch = true
-  }
+  tags = { Name = "${var.project_name}-private-rt" }
+}
+
+# 4. 将路由表关联到所有的私有子网 (App 层和 DB 层)
+resource "aws_route_table_association" "private_app_1" {
+  subnet_id      = aws_subnet.private_app_subnet_1.id
+  route_table_id = aws_route_table.private.id
+}
+
+resource "aws_route_table_association" "private_app_2" {
+  subnet_id      = aws_subnet.private_app_subnet_2.id
+  route_table_id = aws_route_table.private.id
+}
+
+resource "aws_route_table_association" "private_db_1" {
+  subnet_id      = aws_subnet.private_db_subnet_1.id
+  route_table_id = aws_route_table.private.id
+}
+
+resource "aws_route_table_association" "private_db_2" {
+  subnet_id      = aws_subnet.private_db_subnet_2.id
+  route_table_id = aws_route_table.private.id
 }

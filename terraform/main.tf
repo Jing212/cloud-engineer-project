@@ -14,6 +14,7 @@ provider "aws" {
 module "vpc" {
   source = "./modules/vpc"
 
+  project_name              = var.project_name
   vpc_cidr                  = "10.0.0.0/16"
   public_subnet_1_cidr      = "10.0.11.0/24"
   public_subnet_2_cidr      = "10.0.12.0/24"
@@ -32,11 +33,13 @@ module "sg" {
 }
 
 module "ec2" {
-  source            = "./modules/ec2"
-  project_name      = var.project_name
-  subnet_id         = module.vpc.public_subnet_1_id
-  security_group_id = module.sg.ec2_sg_id
-  ami_id            = "ami-02dfbd4ff395f2a1b"
+  source                = "./modules/ec2"
+  project_name          = var.project_name
+  subnet_id             = module.vpc.public_subnet_1_id
+  security_group_id     = module.sg.ec2_sg_id
+  ami_id                = "ami-02dfbd4ff395f2a1b"
+  instance_type         = var.instance_type
+  instance_profile_name = module.iam_ec2_ssm.instance_profile_name
 }
 
 module "alb" {
@@ -55,7 +58,6 @@ module "asg" {
   project_name          = var.project_name
   ami_id                = "ami-02dfbd4ff395f2a1b"
   instance_type         = "t2.micro"
-  key_name              = "Terraform-key"
   security_group_id     = module.sg.ec2_sg_id
   instance_profile_name = module.iam_ec2_ssm.instance_profile_name
 
